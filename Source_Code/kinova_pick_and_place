@@ -1,0 +1,84 @@
+"""
+Kinova Gen3 pick-and-place sequence forming a 'T' shape with two blocks.
+
+Uses:
+- Kortex API BaseClient & BaseCyclicClient
+- Modular Cartesian motions (relative moves)
+- Separate gripper open/close commands
+"""
+
+import os
+import sys
+
+from kortex_api.autogen.client_stubs.BaseClientRpc import BaseClient
+from kortex_api.autogen.client_stubs.BaseCyclicClientRpc import BaseCyclicClient
+
+from kinova.motions import example_move_to_home_position, cartesian_move
+from kinova.gripper import GripperOpen, GripperClose
+
+
+def main():
+    # Add Kinova utilities path (assumes you have their SDK utilities module)
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    import utilities  # from Kinova Kortex examples
+
+    args = utilities.parseConnectionArguments()
+
+    # 1) Move to Home
+    with utilities.DeviceConnection.createTcpConnection(args) as router:
+        base = BaseClient(router)
+        base_cyclic = BaseCyclicClient(router)
+
+        success = example_move_to_home_position(base)
+        if not success:
+            return 1
+
+    # 2) Open gripper before approach
+    with utilities.DeviceConnection.createTcpConnection(args) as router:
+        opener = GripperOpen(router)
+        opener.execute()
+
+    # 3) Approach first block, grasp, move, release, etc.
+    #    (Replace dx/dy/dz offsets with your actual values from the lab.)
+
+    with utilities.DeviceConnection.createTcpConnection(args) as router:
+        base = BaseClient(router)
+        base_cyclic = BaseCyclicClient(router)
+
+        # Example: move above block 1
+        cartesian_move(base, base_cyclic, dz=0.2, label="Move above block 1")
+
+        # Example: descend to block 1
+        cartesian_move(base, base_cyclic, dz=-0.2, label="Descend to block 1")
+
+    with utilities.DeviceConnection.createTcpConnection(args) as router:
+        # Close gripper to grasp block 1
+        closer = GripperClose(router)
+        closer.execute()
+
+    with utilities.DeviceConnection.createTcpConnection(args) as router:
+        base = BaseClient(router)
+        base_cyclic = BaseCyclicClient(router)
+
+        # Example: lift block 1
+        cartesian_move(base, base_cyclic, dz=0.2, label="Lift block 1")
+
+        # Example: move to 'T' placement position
+        cartesian_move(base, base_cyclic, dx=0.1, label="Move to T placement")
+
+        # Example: lower to place
+        cartesian_move(base, base_cyclic, dz=-0.2, label="Lower block 1 to T position")
+
+    with utilities.DeviceConnection.createTcpConnection(args) as router:
+        # Open gripper to release block 1
+        opener = GripperOpen(router)
+        opener.execute()
+
+    # Repeat similar sequence for second block if you want the full 'T'
+
+    print("Pick-and-place sequence completed.")
+    return 0
+
+
+if __name__ == "__main__":
+    main()
